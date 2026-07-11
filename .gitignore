@@ -1,0 +1,19 @@
+# Visual Studio
+.vs/
+*.user
+*.suo
+
+# Build outputs
+bin/
+obj/
+
+# React/Node
+node_modules/
+dist/
+.env
+.env.local
+
+# .NET
+*.dll
+*.exe
+appsettings.Development.json
