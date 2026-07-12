@@ -90,5 +90,21 @@ namespace TaskManager.Api.Controllers
         {
             throw new NotImplementedException();
         }
+
+        //GET: api/tasks/summary
+        [HttpGet("summary")]
+        public async Task<IActionResult> GetSummary()
+        {
+            var total = await _context.Tasks.CountAsync();
+            var pending = await _context.Tasks.CountAsync(t => !t.IsCompleted);
+            var completed = await _context.Tasks.CountAsync(t => t.IsCompleted);
+            var summary = new
+            {
+                TotalTasks = total,
+                Pending = pending,
+                CompletedTask = completed
+            };
+            return Ok(summary);
+        }
     }
 }
