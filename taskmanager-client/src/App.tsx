@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import TaskList from './components/TaskList'
 import TaskForm from './components/TaskForm'
+import AIAgent from './components/AIAgent'
 
 type Filter = 'all' | 'completed' | 'pending';
 
@@ -8,12 +9,14 @@ function App() {
 
   const [ refresh, setRefresh ] = useState(0);
   const [ filter, setFilter ] = useState<Filter>('all');
+  const handleAction = () => setRefresh(r => r + 1)
   return (
     <div className="min-h-screen bg-gray-100 p-8 max-w-2xl mx-auto">
       <h1 className="text-3xl font-bold text-blue-600">
         Task Manager
       </h1>
-      <TaskForm onTaskCreated={() => setRefresh(r => r + 1)} />
+      <AIAgent onAction={ handleAction} />
+      <TaskForm onTaskCreated= {handleAction} />
 
       <div className="flex gap-2 mb-4">
         {(['all', 'completed', 'pending'] as Filter[]).map(f => (
