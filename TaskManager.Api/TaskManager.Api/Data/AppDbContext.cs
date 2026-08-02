@@ -11,5 +11,7 @@ namespace TaskManager.Api.Data
         }
 
         public DbSet<TaskItem> Tasks { get; set; } = null!;
+        public DbSet<Conversation> Conversations { get; set; } = null!;
+        public DbSet<ConversationMessage> ConversationMessages { get; set; } = null!;
     }
 }

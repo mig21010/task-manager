@@ -29,6 +29,62 @@ namespace TaskManager.Api.Controllers
         public async Task<IActionResult> Chat(
             [FromBody] ClaudeChatRequest request)
         {
+
+            Conversation conversation;
+
+            if(request.ConversationId.HasValue) 
+            {
+                conversation = await _context.Conversations.Include(c => c.Messages)
+                    .FirstOrDefaultAsync(c => c.Id == request.ConversationId)
+                    ?? new Conversation
+                    {
+                        Title = request.Message[..Math.Min(50, request.Message.Length)],
+                        CreatedAt = DateTime.UtcNow,
+                     
+                    };
+
+            } 
+            else 
+            {
+                conversation = new Conversation
+                {
+                    Title = request.Message[..Math.Min(50, request.Message.Length)],
+                    CreatedAt = DateTime.UtcNow,
+                 
+                };
+                _context.Conversations.Add(conversation);
+                await _context.SaveChangesAsync();
+            }
+
+            var userMessage = new ConversationMessage
+            {
+                Role = "user",
+                Content = request.Message,
+                CreatedAt = DateTime.UtcNow,
+                ConversationId = conversation.Id
+            };
+
+            _context.ConversationMessages.Add(userMessage);
+            await _context.SaveChangesAsync();
+
+            var history = conversation.Messages
+                .OrderBy(m => m.CreatedAt)
+                .Select(m => new { role = m.Role, content = m.Content })
+                .ToList<object>();
+
+            history.Add(new { role = "user", content = request.Message });
+
+            var assistantMessage = new ConversationMessage
+            {
+                Role = "assistant",
+                Content = "",
+                CreatedAt = DateTime.UtcNow,
+                ConversationId = conversation.Id
+            };
+
+            _context.ConversationMessages.Add(assistantMessage);
+            await _context.SaveChangesAsync();
+
             var apiKey = _config["Anthropic:ApiKey"];
 
             var body = new
@@ -130,7 +186,9 @@ namespace TaskManager.Api.Controllers
                     .GetString() == "text")
                 .GetProperty("text").GetString();
 
-            return Ok(new { reply = text });
+            var reply = text ?? "";
+
+            return Ok(new { reply, conversationId = conversation.Id });
         }
 
         private async Task<string> ExecuteFunction(
@@ -185,5 +243,6 @@ namespace TaskManager.Api.Controllers
     public class ClaudeChatRequest
     {
         public string Message { get; set; } = "";
+        public int? ConversationId { get; set; }
     }
 }
