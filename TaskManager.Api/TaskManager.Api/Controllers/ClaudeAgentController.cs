@@ -72,8 +72,6 @@ namespace TaskManager.Api.Controllers
                 .Select(m => new { role = m.Role, content = m.Content })
                 .ToList<object>();
 
-            history.Add(new { role = "user", content = request.Message });
-
             var assistantMessage = new ConversationMessage
             {
                 Role = "assistant",
@@ -92,10 +90,7 @@ namespace TaskManager.Api.Controllers
                 model = "claude-haiku-4-5",
                 max_tokens = 1024,
                 system = "You are a task management assistant. Help users manage their tasks using the available tools. Respond in the same language the user writes in.",
-                messages = new[]
-                {
-                    new { role = "user", content = request.Message }
-                },
+                messages = history.ToList(),
                 tools = new object[]
                 {
                     new
@@ -187,6 +182,11 @@ namespace TaskManager.Api.Controllers
                 .GetProperty("text").GetString();
 
             var reply = text ?? "";
+
+            assistantMessage.Content = reply;
+            _context.ConversationMessages
+                .Update(assistantMessage);
+            await _context.SaveChangesAsync();
 
             return Ok(new { reply, conversationId = conversation.Id });
         }

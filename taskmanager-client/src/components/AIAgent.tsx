@@ -13,6 +13,8 @@ export default function AIAgent({ onAction }: { onAction: () => void }) {
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
 
+    const [conversationId, setConversationId] = useState<string | null>(null);
+
     const sendMessage = async () => {
         if (!input.trim()) return;
         setLoading(true);
@@ -22,8 +24,12 @@ export default function AIAgent({ onAction }: { onAction: () => void }) {
         setInput('');
 
         try {
-            const response = await axios.post(AGENT_API_URL, { message: userMessage });
+            const response = await axios.post(AGENT_API_URL, { message: userMessage, conversationId : conversationId });
             const assistantMessage = response.data.reply;
+
+            if( response.data.conversationId) {
+                setConversationId(response.data.conversationId);
+            }
             setMessages(prev => [...prev, { role: 'assistant', content: assistantMessage }]);
             onAction();
         } catch (error) {
