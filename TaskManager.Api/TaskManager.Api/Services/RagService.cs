@@ -1,6 +1,7 @@
-﻿using OpenAI.Embeddings;
+﻿using Microsoft.Extensions.Configuration;
+using OpenAI.Embeddings;
 using Pinecone;
-using Microsoft.Extensions.Configuration;
+using System.Diagnostics;
 
 
 
@@ -15,14 +16,33 @@ namespace TaskManager.Api.Services
 
         public RagService(IConfiguration configuration)
         {
-          
-            _pinecone = new PineconeClient(configuration["Pinecone:ApiKey"]!);
-            _embeddings = new EmbeddingClient(
+
+            try
+            {
+                Console.WriteLine("Initializing PineconeClient...");
+                _pinecone = new PineconeClient(configuration["Pinecone:ApiKey"]!);
+
+                Console.WriteLine("PineconeClient OK ✅");
+
+                Console.WriteLine("Initializing EmbeddingClient...");
+                _embeddings = new EmbeddingClient(
                 "text-embedding-3-small",
                 configuration["OpenAI:ApiKey"]!
                 );
+                Console.WriteLine("EmbeddingClient OK ✅");
 
-            _indexHost = configuration["Pinecone:Host"]!;
+                Console.WriteLine("Reading Pinecone Host...");
+
+                _indexHost = configuration["Pinecone:Host"]!;
+
+                Console.WriteLine($"Host: {_indexHost} ✅");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error initializing RagService: {ex.Message}");
+                Console.WriteLine(ex.StackTrace);
+                throw;
+            }
         }
 
 
@@ -31,8 +51,21 @@ namespace TaskManager.Api.Services
 
         public async Task<float[]> GetEmbeddingAsync(string text)
         {
-            var result = await _embeddings.GenerateEmbeddingAsync(text);
-            return result.Value.ToFloats().ToArray();
+            Console.WriteLine($"OpenAI Key: {_embeddings != null}");
+
+            try
+            {
+
+
+                var result = await _embeddings.GenerateEmbeddingAsync(text);
+                return result.Value.ToFloats().ToArray();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error generating embedding: {ex.Message}");
+                return Array.Empty<float>();
+
+            }
         }
 
 
@@ -40,26 +73,53 @@ namespace TaskManager.Api.Services
 
         public async Task UpsertTaskAsync( int taskId, string title, string? description)
         {
-            var text = $"{title} {description}";
-            var embedding = await GetEmbeddingAsync(text);
-            var index = _pinecone.Index(host: _indexHost);
 
-            await index.UpsertAsync(new UpsertRequest
+            try
             {
-                Vectors = new List<Vector>
+                Trace.WriteLine("=== START UPSERT ===");
+                Trace.WriteLine($"Generating embedding for: {title}");
+                var text = $"{title} {description}";
+                Trace.WriteLine($"Generating embedding...");
+
+                var embedding = await GetEmbeddingAsync(text);
+
+                Trace.WriteLine($"Embedding: {embedding.Length} dims");
+
+                Console.WriteLine($"Getting index: {_indexHost}");
+                var index = _pinecone.Index(host: _indexHost);
+
+                Console.WriteLine("Index obtained");
+
+                
+
+                await index.UpsertAsync(new UpsertRequest
                 {
-                    new Vector
+                    Vectors = new List<Vector>
                     {
-                        Id = taskId.ToString(),
-                        Values = embedding,
-                        Metadata = new Metadata
+                        new Vector
                         {
-                            { "title", title },
-                            { "description", description ?? string.Empty }
+                            Id = taskId.ToString(),
+                            Values = embedding,
+                            Metadata = new Metadata
+                            {
+                                { "title", title },
+                                { "description", description ?? string.Empty }
+                            }
                         }
                     }
-                }
-            });
+                });
+
+                Console.WriteLine($"Task {taskId} upserted to Pinecone ✅");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"RAG Error type: {ex.GetType().Name}");
+                Console.WriteLine($"RAG Error: {ex.Message}");
+                if (ex.InnerException != null)
+                    Console.WriteLine($"Inner: {ex.InnerException.Message}");
+               
+            }
+
 
         }
 
@@ -76,7 +136,7 @@ namespace TaskManager.Api.Services
             });
 
             return results.Matches?
-                .Where(m=> m.Score >= 0,5f && m.Metadata != null)
+                .Where(m=> m.Score >= 0.3f && m.Metadata != null)
                 .Select(m => (Id: int.Parse(m.Id), Title: m.Metadata["title"].ToString() ?? ""))
                 .ToList() ?? new List<(int, string)>();
         }

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import axios from 'axios';
 
-const AGENT_API_URL = 'https://localhost:7159/api/ClaudeAgent/chat';
+const AGENT_API_URL = 'http://localhost:5183/api/ClaudeAgent/chat';
 
 interface Massage {
     role: 'user' | 'assistant';

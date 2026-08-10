@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using TaskManager.Api.Data;
 using TaskManager.Api.Models;
+using TaskManager.Api.Services;
 
 namespace TaskManager.Api.Controllers
 {
@@ -15,14 +16,17 @@ namespace TaskManager.Api.Controllers
         private readonly AppDbContext _context;
         private readonly IConfiguration _config;
         private readonly HttpClient _http;
+        private readonly RagService _ragService;
 
         public ClaudeAgentController(
             AppDbContext context,
-            IConfiguration config)
+            IConfiguration config,
+            RagService ragService)
         {
             _context = context;
             _config = config;
             _http = new HttpClient();
+            _ragService = ragService;
         }
 
         [HttpPost("chat")]
@@ -129,6 +133,23 @@ namespace TaskManager.Api.Controllers
                             properties = new { },
                             required = new string[] { }
                         }
+                    },
+                    new
+                    {
+                        name = "search_similar_tasks",
+                        description = "Searches for tasks semantically similar to a query using RAG",
+                        input_schema = new
+                        {
+                            type = "object",
+                            properties = new
+                            {
+                                query = new {
+                                    type = "string",
+                                    description = "The search query to find similar tasks"
+                                }
+                            },
+                            required = new[] { "query" }
+                        }
                     }
                 }
             };
@@ -234,6 +255,24 @@ namespace TaskManager.Api.Controllers
                     task.IsCompleted = true;
                 await _context.SaveChangesAsync();
                 return $"✅ {tasks.Count} tasks completed!";
+            }
+
+            if (name == "search_similar_tasks")
+            {
+                var args = JsonDocument.Parse(argsJson);
+                var query = args.RootElement
+                    .GetProperty("query").GetString()!;
+
+                var results = await _ragService
+                    .SearchSimilarAsync(query);
+
+                if (!results.Any())
+                    return "No similar tasks found.";
+
+                var list = string.Join("\n", results
+                    .Select(r => $"- [{r.Id}] {r.Title}"));
+
+                return $"Found similar tasks:\n{list}";
             }
 
             return "Unknown function";

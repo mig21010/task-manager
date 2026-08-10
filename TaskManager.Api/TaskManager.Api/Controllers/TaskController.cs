@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using TaskManager.Api.Data;
 using TaskManager.Api.Models;
+using TaskManager.Api.Services;
 
 namespace TaskManager.Api.Controllers
 {
@@ -10,8 +11,10 @@ namespace TaskManager.Api.Controllers
     public class TasksController : ControllerBase
     {
         private readonly AppDbContext _context;
-        public TasksController(AppDbContext context) {
+        private readonly RagService _ragService;
+        public TasksController(AppDbContext context, RagService ragService) {
             _context = context;
+            _ragService = ragService;
         }
 
         //GET: api/tasks
@@ -41,6 +44,25 @@ namespace TaskManager.Api.Controllers
             task.CreatedAt = DateTime.UtcNow;
             _context.Tasks.Add(task);
             await _context.SaveChangesAsync();
+
+            try
+            {
+
+                //saved task to database, now we can call the RAG service to get the RAG status for this task
+                await _ragService.UpsertTaskAsync(
+                task.Id,
+                task.Title,
+                task.Description);
+            }
+            catch (Exception ex)
+            {
+                // Log el error pero no falla
+                // la creación de la tarea
+                Console.WriteLine(
+                    $"RAG Error: {ex.Message}");
+                Console.WriteLine($"Inner: {ex.InnerException?.Message}");
+            }
+
             return CreatedAtAction(nameof(GetById), new { id = task.Id }, task);
         }
 

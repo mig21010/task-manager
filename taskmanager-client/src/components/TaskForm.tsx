@@ -14,7 +14,7 @@ export default function TaskForm({ onTaskCreated }: Props) {
         setLoading(true);
         // Simulate an API call
         try {
-            const response = await fetch('https://localhost:7159/api/Tasks', {
+            const response = await fetch('http://localhost:5183/api/Tasks', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'

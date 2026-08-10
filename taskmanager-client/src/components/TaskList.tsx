@@ -12,7 +12,7 @@ interface Props {
   filter: 'all' | 'completed' | 'pending';
 }
 
-const API_URL = "https://localhost:7159/api/Tasks";
+const API_URL = "http://localhost:5183/api/Tasks";
 
 export default function TaskList({ filter }: Props) {
     const [tasks, setTasks] = useState<Task[]>([]);
