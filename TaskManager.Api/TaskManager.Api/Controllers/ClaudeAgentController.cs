@@ -93,7 +93,13 @@ namespace TaskManager.Api.Controllers
             {
                 model = "claude-haiku-4-5",
                 max_tokens = 1024,
-                system = "You are a task management assistant. Help users manage their tasks using the available tools. Respond in the same language the user writes in.",
+                system = "You are a task management assistant. " +
+                 "Help users manage their tasks using the available tools. " +
+                 "Respond in the same language the user writes in. " +
+                 "IMPORTANT: When a user asks to complete a task by name, " +
+                 "first use search_similar_tasks to find it, " +
+                 "then immediately use complete_task with the found ID " +
+                 "without asking for confirmation.",
                 messages = history.ToList(),
                 tools = new object[]
                 {
@@ -150,7 +156,25 @@ namespace TaskManager.Api.Controllers
                             },
                             required = new[] { "query" }
                         }
+                    },
+                    new
+                    {
+                        name = "complete_task",
+                        description = "Marks a specific task as completed by its ID or title",
+                        input_schema = new
+                        {
+                            type = "object",
+                            properties = new
+                            {
+                                taskId = new {
+                                    type = "integer",
+                                    description = "The ID of the task to complete"
+                                }
+                            },
+                            required = new[] { "taskId" }
+                        }
                     }
+
                 }
             };
 
@@ -173,6 +197,7 @@ namespace TaskManager.Api.Controllers
             Console.WriteLine(responseStr);
 
             var doc = JsonDocument.Parse(responseStr);
+
             var stopReason = doc.RootElement
                 .GetProperty("stop_reason").GetString();
 
@@ -188,11 +213,113 @@ namespace TaskManager.Api.Controllers
                     .GetProperty("name").GetString()!;
                 var toolInput = toolBlock
                     .GetProperty("input").ToString();
+                var toolId = toolBlock
+                    .GetProperty("id").GetString()!;
 
-                var result = await ExecuteFunction(
-                    toolName, toolInput);
+                var result = await ExecuteFunction(toolName, toolInput);
 
-                return Ok(new { reply = result });
+                // Si fue search → pasar resultado a Claude
+                // para que decida el siguiente paso
+                if (toolName == "search_similar_tasks")
+                {
+                    // Agregar al historial:
+                    // 1. Respuesta de Claude con tool_use
+                    // 2. Resultado de la tool
+                    var assistantContent = doc.RootElement
+                        .GetProperty("content").ToString();
+
+                    var toolResultMessages = new List<object>(history)
+        {
+            new {
+                role = "assistant",
+                content = System.Text.Json.JsonSerializer
+                    .Deserialize<object>(assistantContent)
+            },
+            new {
+                role = "user",
+                content = new object[]
+                {
+                    new {
+                        type = "tool_result",
+                        tool_use_id = toolId,
+                        content = result
+                    }
+                }
+            }
+        };
+
+                    // Segunda llamada a Claude con el resultado
+                    var body2 = new
+                    {
+                        model = "claude-haiku-4-5",
+                        max_tokens = 1024,
+                        system = body.system,
+                        messages = toolResultMessages,
+                        tools = body.tools
+                    };
+
+                    var json2 = JsonSerializer.Serialize(body2);
+                    var content2 = new StringContent(
+                        json2, Encoding.UTF8, "application/json");
+
+                    _http.DefaultRequestHeaders.Clear();
+                    _http.DefaultRequestHeaders.Add("x-api-key", apiKey);
+                    _http.DefaultRequestHeaders.Add(
+                        "anthropic-version", "2023-06-01");
+
+                    var response2 = await _http.PostAsync(
+                        "https://api.anthropic.com/v1/messages",
+                        content2);
+
+                    var responseStr2 = await response2.Content
+                        .ReadAsStringAsync();
+                    var doc2 = JsonDocument.Parse(responseStr2);
+
+                    // Si Claude quiere usar otra tool
+                    if (doc2.RootElement.GetProperty("stop_reason")
+                        .GetString() == "tool_use")
+                    {
+                        var toolBlock2 = doc2.RootElement
+                            .GetProperty("content")
+                            .EnumerateArray()
+                            .First(c => c.GetProperty("type")
+                                .GetString() == "tool_use");
+
+                        var toolName2 = toolBlock2
+                            .GetProperty("name").GetString()!;
+                        var toolInput2 = toolBlock2
+                            .GetProperty("input").ToString();
+
+                        var result2 = await ExecuteFunction(
+                            toolName2, toolInput2);
+
+                        return Ok(new
+                        {
+                            reply = result2,
+                            conversationId = conversation.Id
+                        });
+                    }
+
+                    // Claude respondió con texto
+                    var text2 = doc2.RootElement
+                        .GetProperty("content")
+                        .EnumerateArray()
+                        .First(c => c.GetProperty("type")
+                            .GetString() == "text")
+                        .GetProperty("text").GetString();
+
+                    return Ok(new
+                    {
+                        reply = text2 ?? result,
+                        conversationId = conversation.Id
+                    });
+                }
+
+                return Ok(new
+                {
+                    reply = result,
+                    conversationId = conversation.Id
+                });
             }
 
             var text = doc.RootElement
@@ -238,7 +365,8 @@ namespace TaskManager.Api.Controllers
                 await _ragService.UpsertTaskAsync(
                     task.Id,
                     task.Title,
-                    task.Description);
+                    task.Description,
+                    false);
 
 
                 return $"✅ Task \"{title}\" created!";
@@ -281,6 +409,32 @@ namespace TaskManager.Api.Controllers
                     .Select(r => $"- [{r.Id}] {r.Title}"));
 
                 return $"Found similar tasks:\n{list}";
+            }
+
+
+            if (name == "complete_task")
+            {
+                var args = JsonDocument.Parse(argsJson);
+                var taskId = args.RootElement
+                    .GetProperty("taskId").GetInt32();
+
+                var task = await _context.Tasks
+                    .FindAsync(taskId);
+
+                if (task == null)
+                    return $"❌ Task {taskId} not found";
+
+                task.IsCompleted = true;
+                await _context.SaveChangesAsync();
+
+                // Actualizar en Pinecone
+                await _ragService.UpsertTaskAsync(
+                    task.Id,
+                    task.Title,
+                    task.Description,
+                    true);
+
+                return $"✅ Task \"{task.Title}\" completed!";
             }
 
             return "Unknown function";

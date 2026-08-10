@@ -79,6 +79,12 @@ namespace TaskManager.Api.Controllers
             try
             {
                 await _context.SaveChangesAsync();
+                //update pinecone
+                await _ragService.UpsertTaskAsync(
+                    task.Id,
+                    task.Title,
+                    task.Description,
+                    task.IsCompleted);
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -90,6 +96,10 @@ namespace TaskManager.Api.Controllers
                 {
                     throw;
                 }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"RAG update error: {ex.Message}");
             }
             return NoContent();
         }

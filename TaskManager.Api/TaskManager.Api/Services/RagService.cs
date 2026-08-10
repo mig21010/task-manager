@@ -71,7 +71,7 @@ namespace TaskManager.Api.Services
 
         // save task embedding to Pinecone vector database
 
-        public async Task UpsertTaskAsync( int taskId, string title, string? description)
+        public async Task UpsertTaskAsync( int taskId, string title, string? description, bool isCompleted = false)
         {
 
             try
@@ -103,7 +103,8 @@ namespace TaskManager.Api.Services
                             Metadata = new Metadata
                             {
                                 { "title", title },
-                                { "description", description ?? string.Empty }
+                                { "description", description ?? string.Empty },
+                                { "isCompleted", isCompleted.ToString() }
                             }
                         }
                     }
