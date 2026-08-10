@@ -233,6 +233,14 @@ namespace TaskManager.Api.Controllers
                 };
                 _context.Tasks.Add(task);
                 await _context.SaveChangesAsync();
+
+                //index pinecone
+                await _ragService.UpsertTaskAsync(
+                    task.Id,
+                    task.Title,
+                    task.Description);
+
+
                 return $"✅ Task \"{title}\" created!";
             }
 
