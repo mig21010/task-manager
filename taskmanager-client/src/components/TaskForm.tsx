@@ -37,11 +37,11 @@ export default function TaskForm({ onTaskCreated }: Props) {
     return (
        <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow p-4 mb-6">
         <h2 className="text-lg font-semibold text-gray-700 mb-3">
-            Nueva Tarea
+            New Task
         </h2>
         <input
             type="text"
-            placeholder="Título"
+            placeholder="Title"
             value={title}
             onChange={e => setTitle(e.target.value)}
             className="w-full border rounded p-2 mb-2 text-sm"
@@ -49,7 +49,7 @@ export default function TaskForm({ onTaskCreated }: Props) {
         />
         <input
             type="text"
-            placeholder="Descripción"
+            placeholder="Description"
             value={description}
             onChange={e => setDescription(e.target.value)}
             className="w-full border rounded p-2 mb-3 text-sm"
@@ -59,7 +59,7 @@ export default function TaskForm({ onTaskCreated }: Props) {
             disabled={loading}
             className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 disabled:opacity-50"
         >
-            {loading ? 'Guardando...' : 'Agregar Tarea'}
+            {loading ? 'Save...' : 'Add Task'}
         </button>
         </form>
     );

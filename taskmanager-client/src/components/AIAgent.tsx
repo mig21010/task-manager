@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import axios from 'axios';
+import ReactMarkdown from 'react-markdown'
+
 
 const AGENT_API_URL = 'http://localhost:5183/api/ClaudeAgent/chat';
 
@@ -47,11 +49,24 @@ export default function AIAgent({ onAction }: { onAction: () => void }) {
                     <p className="text-gray-500 text-sm">Try: "Create a task to review the code" or "Show me a summary</p>
                 ) }
                 {messages.map((msg, index) => (
-                    <div key={index} className={`mb-2 p-2 rounded ${msg.role === 'user' ? 'bg-blue-100 text-blue-800 self-end' : 'bg-gray-100 text-gray-800 self-start'}`}>
+                    <div 
+                        key={index} 
+                        className={`mb-2 p-2 rounded ${
+                            msg.role === 'user' 
+                                ? 'bg-blue-100 text-blue-800' 
+                                : 'bg-gray-100 text-gray-800'
+                        }`}
+                    >
                         <span className="font-medium">
-                        {msg.role === 'user' ? 'You: ' : '🤖 '}
+                            {msg.role === 'user' ? 'You: ' : '🤖 '}
                         </span>
-                        {msg.content}
+                        {msg.role === 'assistant' ? (
+                            <ReactMarkdown>
+                                {msg.content}
+                            </ReactMarkdown>
+                        ) : (
+                            <span>{msg.content}</span>
+                        )}
                     </div>
                 ))}
                 {loading && (

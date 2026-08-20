@@ -29,7 +29,7 @@ function App() {
             }`}
             onClick={() => setFilter(f)}
           >
-            {f === 'all' ? 'Todas' : f === 'completed' ? 'Completadas' : 'Pendientes'}
+            {f === 'all' ? 'All' : f === 'completed' ? 'Completed' : 'Pending'}
           </button>
         ))}
       </div>
