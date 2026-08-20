@@ -1,7 +1,10 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Http.Resilience;
+using Polly;
 using System.Diagnostics;
 using TaskManager.Api.Data;
 using TaskManager.Api.Services;
+using System.Text.Json;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -24,6 +27,47 @@ builder.Services.AddCors(options =>
     });
 });
 
+builder.Services.AddHttpClient("ClaudeClient")
+    .AddResilienceHandler("claude-pipeline", builder =>
+    {
+        // Retry con exponential backoff:
+        builder.AddRetry(new HttpRetryStrategyOptions
+        {
+            MaxRetryAttempts = 3,
+            Delay = TimeSpan.FromSeconds(2),
+            BackoffType = DelayBackoffType.Exponential,
+            UseJitter = true, // variación aleatoria
+            ShouldHandle = new PredicateBuilder<HttpResponseMessage>()
+                .HandleResult(r =>
+                    r.StatusCode == System.Net.HttpStatusCode.TooManyRequests ||
+                    r.StatusCode == System.Net.HttpStatusCode.ServiceUnavailable)
+        });
+
+        // Timeout por intento:
+        builder.AddTimeout(TimeSpan.FromSeconds(30));
+    });
+
+builder.Services.AddHttpClient("ClaudeClient")
+    .AddResilienceHandler("claude-pipeline", pipeline =>
+    {
+        // 1. Retry:
+        pipeline.AddRetry(new HttpRetryStrategyOptions
+        {
+            MaxRetryAttempts = 3,
+            Delay = TimeSpan.FromSeconds(2),
+            BackoffType = DelayBackoffType.Exponential,
+            UseJitter = true,
+            ShouldHandle = new PredicateBuilder<HttpResponseMessage>()
+                .HandleResult(r =>
+                    r.StatusCode ==
+                        System.Net.HttpStatusCode.TooManyRequests ||
+                    r.StatusCode ==
+                        System.Net.HttpStatusCode.ServiceUnavailable)
+        });
+
+        // 2. Timeout:
+        pipeline.AddTimeout(TimeSpan.FromSeconds(30));
+    });
 try
 {
 
