@@ -16,7 +16,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddScoped<RagService>();
-
+  
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReact", policy =>

@@ -16,4 +16,5 @@ dist/
 # .NET
 *.dll
 *.exe
+appsettings.json
 appsettings.Development.json
